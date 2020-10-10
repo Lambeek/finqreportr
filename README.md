@@ -1,5 +1,9 @@
-# finqreportr
-A R package for downloading and displaying quarterly-report financial data from SEC's EDGAR database
+# finqreportr – Querying Quarterly Financial Data from SEC EDGAR Database
+
+* Author/Maintainer: [Lambert Kou](https://github.com/Lambeek)
+
+## Introduction
+
 Since its release,
 [finreportr](https://github.com/sewardlee337/finreportr) has been a
 handy package for financial analysts who use R for data analysis and
