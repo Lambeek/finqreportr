@@ -1,0 +1,19 @@
+Package: finqreportr
+Version: 0.99.01
+Date: 2020-10-10
+Title: Financial statments (quarterly reports) scraper
+Author: Lambert Kou
+Maintainer: Lambert Kou <kzhuoqun@gmail.com>
+Depends: R (>= 3.1.0), dplyr, curl, XBRL, edgarWebR
+Suggests:
+    knitr,
+    rmarkdown
+Description: A R package for downloading and displaying financial data
+             (quarterly reporting) from SEC's EDGAR database
+URL: https://github.com/Lambeek/finqreportr
+BugReports: https://github.com/Lambeek/finqreportr/issues
+VignetteBuilder: knitr
+RoxygenNote: 7.1.1
+NeedsCompilation: no
+Encoding: UTF-8
+Packaged: 2020-10-09 09:53:27 UTC; pz

@@ -1,0 +1,6 @@
+^\.Rproj\.user$
+\.Rproj$
+^\.gitignore$
+^\.travis\.yml$
+^doc$
+^Meta$

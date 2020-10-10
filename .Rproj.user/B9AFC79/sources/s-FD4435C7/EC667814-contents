@@ -1,0 +1,192 @@
+---
+title: "finqreportr – Querying Quarterly Financial Data from SEC EDGAR Database"
+author: "Lambert Kou"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{finqreportr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+options(width = 300)
+```
+Since its release, [finreportr](https://github.com/sewardlee337/finreportr) has been a handy package for financial analysts who use R for data analysis and need to query financial reports of publicly traded companies from the EDGAR database of U.S. Securities and Exchange Commission (SEC). However, it still comes with two major drawbacks. First, it only allows users to scrape annual reports from 10-K forms, not quarterly reports from 10-Q forms. Second, its important dependent package [XBRL](https://cran.r-project.org/web/packages/XBRL/index.html) for pulling and parsing XBRL-encoded data has not been maintained and updated for years, the bugs of this package has limited the functionality of **finreportr** package. To try to handle the above issues, **finqreportr** is created.
+
+The purpose of **finqreportr** package is to create a R-based web scraper that allows financial analysts to query quarterly-report financial data from SEC EDGAR database. Like **finreportr**, the package itself will not provide any functions for specific financial statement analysis (except the example in package vignettes) but offers a data-loading option for the analysts who need an one-stop workflow using R: accessing, getting and analyzing financial data in only one environment.
+
+For now **finqreportr** is offering three functions that can fetch and load quarterly-report data from the SEC EDGAR database:
+
+* `GetIncome()`: returns the quarterly income statement for a given company in a specific year
+* `GetBalanceSheet()`: returns the quarterly balance sheet for a given company in a specific year
+* `GetCashFlow()`: returns the quarterly cash flow statement for a given company
+in a specific year
+
+## Querying Financial Data
+
+Like **finreportr**, the main benefit of **finqreportr** "comes from allowing users to download and display financial data without having to manually inspect filings from the SEC EDGAR database." It also give users more flexibility to "introduce automation, scalability, and reproducibility to their analysis."
+
+The function `GetIncome()` returns a company's quarterly income statement from a given filing year. Here is the example to query income statement of Tesla Motors (symbol: `TSLA`) from the quarterly report filled in the 1st quarter of 2018:
+
+```{r setup, message=FALSE}
+library(finqreportr)
+```
+
+```{r example_1}
+head(GetIncome("TSLA", 2018, "Q1"))
+```
+
+The function `GetBalanceSheet()` returns a company's quarterly balance sheet from a given filing year. Here is the example to query balance sheet of Amazon (symbol: `AMZN`) from the quarterly report filled in the 2nd quarter of 2017:
+
+```{r example_2}
+head(GetBalanceSheet("AMZN", 2017, "Q2"))
+```
+
+The function `GetCashFlow()` returns a company's quarterly cash flow statement from a given filing year. Here is the example to query cash flow statement of Netflix (symbol: `NFLX`) from the quarterly report filled in the 3rd quarter of 2016:
+
+```{r example_3}
+head(GetCashFlow("NFLX", 2016, "Q3"))
+```
+
+## Case Study: Financial Ratios Calculation and Simple Statistical Analysis
+
+First, let's create a list of stock symbols of 20 publicly traded E-commerce Companies:
+
+```{r case_study}
+symbol_list <- c("AMZN", "APRN", "PRTS", "CVNA", "LIVE", "QRTEA", "QVCC",
+                "EBAY", "ETSY", "EXPE", "GRUB", "RVLV", "OSTK",
+                "CNXN", "SAML", "PETS", "SYX", "STMP","TRIP","W")
+```
+
+Then suppose we want to do some up-to-date financial analysis for these companies, thus we need some quarterly statements filled in the 2nd quarter of 2020. What we can do is to apply functions `GetBalanceSheet()` and `GetIncome()` to each company in that list and store the obtained statements(as data frames) in two separated list:
+
+```{r statement_lists, warning=FALSE}
+BS_list <- lapply(symbol_list, GetBalanceSheet, 2020, "Q2")
+IS_list <- lapply(symbol_list, GetIncome, 2020, "Q2")
+```
+
+Next, we can calculate three important financial ratios: Current Ratio, D/E Ratio, and Net Profit Margin. From one aspect, they may represent the liquidity (Current Ratio), financial leverage (D/E Ratio), and profitability (Net Profit Margin) of these companies in a given period of time. The results are then stored as columns of a newly-created data frame `ratio_df`:
+
+```{r ratio_calculation}
+library(scales)
+
+GetCurrentRatio <- function(x) {
+  currentRatio <- 
+    x[x$Metric %in% c("Assets, Current", 
+                       "Assets Current", 
+                       "us-gaap_AssetsCurrent") & 
+        grepl("2020-06", x$endDate, fixed = TRUE), ]$Amount /
+    x[x$Metric %in% c("Liabilities, Current", 
+                       "Liabilities Current", 
+                       "us-gaap_LiabilitiesCurrent") &
+        grepl("2020-06", x$endDate, fixed = TRUE), ]$Amount
+  return(currentRatio)
+}
+
+GetDERatio <- function(x) {
+  deRatio <- 
+    (x[x$Metric %in% c("Liabilities and Equity", 
+                       "Liabilities And Stockholders Equity", 
+                       "us-gaap_LiabilitiesAndStockholdersEquity") & 
+        grepl("2020-06", x$endDate, fixed = TRUE), ]$Amount - 
+       x[x$Metric %in% c("Stockholders' Equity Attributable to Parent", 
+                         "Stockholders Equity",
+                         "Stockholders' deficiency",
+                         "us-gaap_StockholdersEquity") & 
+        grepl("2020-06", x$endDate, fixed = TRUE), ]$Amount)/
+    x[x$Metric %in% c("Stockholders' Equity Attributable to Parent", 
+                      "Stockholders Equity", 
+                      "Stockholders' deficiency",
+                      "us-gaap_StockholdersEquity") & 
+        grepl("2020-06", x$endDate, fixed = TRUE), ]$Amount
+  return(deRatio)
+}
+
+GetNetProfitMargin <- function(x) {
+  npMargin <- 
+    x[x$Metric %in% c("Net Income (Loss) Attributable to Parent", 
+                      "Net Income Loss", 
+                      "Net income",
+                      "Comprehensive Income (Loss), Net of Tax, Attributable to Parent",
+                      "Net Income Loss Available To Common Stockholders Basic") & 
+        grepl("2020-06", x$endDate, fixed = TRUE) & 
+        (grepl("2020-04", x$startDate, fixed = TRUE) |
+           grepl("2020-03", x$startDate, fixed = TRUE)), ]$Amount /
+    x[x$Metric %in% c("Revenues",
+                      "Sales",
+                      "Revenue, Net",
+                      "Revenues from sales of products",
+                      "Revenue From Contract With Customer Excluding Assessed Tax", 
+                      "Revenue from Contract with Customer, Excluding Assessed Tax") &
+        grepl("2020-06", x$endDate, fixed = TRUE) & 
+        (grepl("2020-04", x$startDate, fixed = TRUE) |
+           grepl("2020-03", x$startDate, fixed = TRUE)), ]$Amount
+  return(npMargin)
+}
+
+currentRatio <- sapply(BS_list, GetCurrentRatio)
+deRatio <- sapply(BS_list, GetDERatio)
+npMargin <- unlist(sapply(IS_list, GetNetProfitMargin)) * 100
+
+ratio_df <- data.frame(currentRatio, deRatio, npMargin)
+names(ratio_df) <- c("Current Ratio", "D/E Ratio", "Net Profit Margin")
+rownames(ratio_df) <- symbol_list
+```
+
+We can then obtain some basic descriptive statistics as shown in the following table:
+
+```{r desc_statistics, echo=FALSE, results = "asis"}
+library(qwraps2)
+options(qwraps2_markup = "markdown")
+stat_summary <-
+  list("Current Ratio" =
+       list("min"       = ~ round(min(`Current Ratio`), digits = 2),
+            "median"    = ~ round(median(`Current Ratio`), digits = 2),
+            "max"       = ~ round(max(`Current Ratio`), digits = 2),
+            "mean ± sd" = ~ qwraps2::mean_sd(`Current Ratio`)),
+       "D/E Ratio" =
+       list("min"       = ~ round(min(`D/E Ratio`), digits = 2),
+            "median"    = ~ round(median(`D/E Ratio`), digits = 2),
+            "max"       = ~ round(max(`D/E Ratio`), digits = 2),
+            "mean ± sd" = ~ qwraps2::mean_sd(`D/E Ratio`)),
+       "Net Profit Margin (%)" =
+       list("min"       = ~ round(min(`Net Profit Margin`), digits = 2),
+            "median"    = ~ round(median(`Net Profit Margin`), digits = 2),
+            "max"       = ~ round(max(`Net Profit Margin`), digits = 2),
+            "mean ± sd" = ~ qwraps2::mean_sd(`Net Profit Margin`))
+       )
+
+stat_table <- summary_table(ratio_df, stat_summary)
+stat_table
+```
+
+We can also create some plots to draw more insights from the data. Take some basic bar plots for example:
+
+```{r bar_plots, echo=FALSE, fig.height = 4, fig.width = 7}
+library(ggplot2)
+
+ggplot(ratio_df, aes(x=row.names(ratio_df), y=`Current Ratio`)) + 
+  geom_bar(stat = "identity", fill="steelblue") + 
+  geom_hline(yintercept = 1, color = "red") + 
+  labs(x = "Ticker Symbol") + 
+  geom_text(aes(label=round(`Current Ratio`, digits = 2)), vjust=-0.3, size=3.5) + 
+  scale_x_discrete(guide = guide_axis(n.dodge=4))
+
+ggplot(ratio_df, aes(x=row.names(ratio_df), y=`D/E Ratio`)) + 
+  geom_bar(stat = "identity", fill="steelblue") + 
+  geom_hline(yintercept = 2, color = "red") +
+  labs(x = "Ticker Symbol") + 
+  geom_text(aes(label=round(`D/E Ratio`, digits = 2)), vjust=-0.3, size=3.5) +
+  scale_x_discrete(guide = guide_axis(n.dodge=4))
+
+ggplot(ratio_df, aes(x=row.names(ratio_df), y=`Net Profit Margin`)) + 
+  geom_bar(stat = "identity", fill="steelblue") + 
+  labs(x = "Ticker Symbol") + 
+  geom_text(aes(label=round(`Net Profit Margin`, digits = 2)), vjust=-0.3, size=3.5) +
+  scale_x_discrete(guide = guide_axis(n.dodge=4))
+```
